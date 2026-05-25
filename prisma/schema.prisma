@@ -1,0 +1,33 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// PoC: SQLite — zero setup, no Docker required.
+// Production upgrade: change provider to "postgresql" and update DATABASE_URL.
+// No other schema changes needed.
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Application Models ───────────────────────────────────────────────────────
+
+model Generation {
+  id                String   @id @default(cuid())
+  userId            String
+  originalRoomUrl   String
+  tileUrl           String
+  generatedImageUrl String?
+  // Status values: PENDING | PROCESSING | DONE | FAILED
+  // Using String (not enum) for SQLite compatibility.
+  // Switch to a Prisma enum when upgrading to PostgreSQL.
+  status            String   @default("PENDING")
+  errorMessage      String?
+  createdAt         DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@map("generations")
+}
