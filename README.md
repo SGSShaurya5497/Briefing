@@ -1,3 +1,6 @@
+# Briefing
+AI-powered tile visualiser for retail stores. Upload a room photo + tile image and instantly see how it looks applied. Built for tile & stone retailers. React · Node.js · TypeScript · PostgreSQL · Gemini API · Docker
+
 This is a Next.js project using the App Router.
 
 ## Setup
@@ -41,3 +44,4 @@ Key variables:
 | `npm run db:migrate` | Deploy migrations |
 | `npm run db:studio` | Open Prisma Studio |
 | `npm run db:seed` | Seed demo data |
+
