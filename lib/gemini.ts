@@ -1,40 +1,72 @@
+import { GoogleGenAI, Modality } from "@google/genai";
+
+/**
+ * Generates a floor-swapped room image using the Gemini image generation API.
+ * Sends both the room photo and tile reference image as multimodal input,
+ * then returns the generated image as a base64 data URL.
+ */
 export async function generateFloorSwap(
   roomImageBuffer: Buffer,
   tileImageBuffer: Buffer,
   roomMimeType: "image/jpeg" | "image/png" | "image/webp",
   tileMimeType: "image/jpeg" | "image/png" | "image/webp"
 ): Promise<string> {
-  if (!process.env.HUGGINGFACE_API_KEY) {
-    throw new Error("HUGGINGFACE_API_KEY is not set in .env.local");
+  if (!process.env.GEMINI_API_KEY) {
+    throw new Error("GEMINI_API_KEY is not set in .env.local");
   }
+
+  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
   const roomBase64 = roomImageBuffer.toString("base64");
+  const tileBase64 = tileImageBuffer.toString("base64");
 
-  const response = await fetch(
-    "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-2-inpainting",
-    {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${process.env.HUGGINGFACE_API_KEY}`,
-        "Content-Type": "application/json",
+  const response = await ai.models.generateContent({
+    model: "gemini-2.0-flash-preview-image-generation",
+    contents: [
+      {
+        role: "user",
+        parts: [
+          {
+            text:
+              "You are an interior design AI. Replace the floor in the room image with the tile pattern shown in the tile reference image. " +
+              "Keep all walls, furniture, lighting, and room layout exactly the same. " +
+              "Only the floor surface should change to use the provided tile design. " +
+              "Output a photorealistic, high-quality interior photograph.",
+          },
+          {
+            inlineData: {
+              mimeType: roomMimeType,
+              data: roomBase64,
+            },
+          },
+          {
+            text: "Tile reference image:",
+          },
+          {
+            inlineData: {
+              mimeType: tileMimeType,
+              data: tileBase64,
+            },
+          },
+        ],
       },
-      body: JSON.stringify({
-        inputs: "photorealistic room with beautiful new floor tiles, same walls and furniture, professional interior photography, high quality",
-        parameters: {
-          negative_prompt: "blurry, distorted, low quality, deformed",
-          num_inference_steps: 30,
-          guidance_scale: 7.5,
-        }
-      }),
-    }
-  );
+    ],
+    config: {
+      responseModalities: [Modality.IMAGE, Modality.TEXT],
+    },
+  });
 
-  if (!response.ok) {
-    const err = await response.text();
-    throw new Error(`Hugging Face error: ${err}`);
+  // Extract the generated image part
+  const parts = response.candidates?.[0]?.content?.parts ?? [];
+  for (const part of parts) {
+    if (part.inlineData?.data) {
+      const mimeType = part.inlineData.mimeType ?? "image/png";
+      return `data:${mimeType};base64,${part.inlineData.data}`;
+    }
   }
 
-  const arrayBuffer = await response.arrayBuffer();
-  const base64 = Buffer.from(arrayBuffer).toString("base64");
-  return `data:image/jpeg;base64,${base64}`;
+  throw new Error(
+    "Gemini did not return an image. Response: " +
+      JSON.stringify(response.candidates?.[0]?.content ?? {})
+  );
 }
